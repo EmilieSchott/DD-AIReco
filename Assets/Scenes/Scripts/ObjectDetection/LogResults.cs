@@ -1,7 +1,7 @@
 using Niantic.Lightship.AR.ObjectDetection;
 using UnityEngine;
 
-public class DetectionLogResults : MonoBehaviour
+public class LogResults : MonoBehaviour
 {
 
     [SerializeField] private ARObjectDetectionManager _objectDetectionManager;
