@@ -845,6 +845,7 @@ PlayerSettings:
   webWasm2023: 0
   scriptingDefineSymbols:
     Android: NIANTIC_LIGHTSHIP_AR_LOADER_ENABLED;NIANTIC_ARDK_USE_FAST_LIGHTWEIGHT_PAM
+    Standalone: NIANTIC_LIGHTSHIP_AR_LOADER_ENABLED;NIANTIC_ARDK_USE_FAST_LIGHTWEIGHT_PAM
   additionalCompilerArguments: {}
   platformArchitecture: {}
   scriptingBackend:
