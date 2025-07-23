@@ -22,6 +22,10 @@ public class ObjectDetectionSample : MonoBehaviour
         Color.black
     };
 
+    [SerializeField] private ListSpawnObjectToObjectClassSO _objectToObjectClassSo;
+    public static event Action<(string category, Vector2 rectPosition)> OnFoundItemAtPosition;
+
+    private List<string> validChannels = new();
 
     [SerializeField] private DrawRect _drawRect;
 
@@ -30,13 +34,14 @@ public class ObjectDetectionSample : MonoBehaviour
 
     private void Awake()
     {
-        _canvas = FindFirstObjectByType<Canvas>();
+        _canvas = FindObjectOfType<Canvas>();
     }
 
     void Start()
     {
         _objectDetectionManager.enabled = true;
         _objectDetectionManager.MetadataInitialized += ObjectDetectionManagerOnMetadataInitialized;
+        SetObjectDetectionChannels();
     }
 
     private void OnDestroy()
@@ -65,8 +70,7 @@ public class ObjectDetectionSample : MonoBehaviour
         for (int i = 0; i < result.Count; i++)
         {
             var detection = result[i];
-            var categorization = detection.GetConfidentCategorizations(_probabilityThreshold);
-
+            var categorization = detection.GetConfidentCategorizations(.5f);
 
             if (categorization.Count <= 0)
             {
@@ -74,25 +78,35 @@ public class ObjectDetectionSample : MonoBehaviour
             }
 
             categorization.Sort((a, b) => b.Confidence.CompareTo(a.Confidence));
+
+
             var categoryToDisplay = categorization[0];
 
-            confidence = categoryToDisplay.Confidence;
-            name = categoryToDisplay.CategoryName;
+            if (validChannels.Contains(categoryToDisplay.CategoryName))
+            {
+                confidence = categoryToDisplay.Confidence;
+                name = categoryToDisplay.CategoryName;
 
-            int h = Mathf.FloorToInt(_canvas.GetComponent<RectTransform>().rect.height);
-            int w = Mathf.FloorToInt(_canvas.GetComponent<RectTransform>().rect.width);
+                int h = Mathf.FloorToInt(_canvas.GetComponent<RectTransform>().rect.height);
+                int w = Mathf.FloorToInt(_canvas.GetComponent<RectTransform>().rect.width);
 
+                var rect = result[i].CalculateRect(w, h, Screen.orientation);
 
+                resultString = $"{name}: {confidence}\n";
 
-            var rect = result[i].CalculateRect(w, h, Screen.orientation);
+                _drawRect.CreateRect(rect, colors[i % colors.Length], resultString);
 
-            resultString = $"{name}: {confidence}\n";
+                OnFoundItemAtPosition?.Invoke((categoryToDisplay.CategoryName, rect.position));
 
-            _drawRect.CreateRect(rect, colors[i % colors.Length], resultString);
-
-
+            }
         }
     }
 
-
+    void SetObjectDetectionChannels()
+    {
+        foreach (var spawnObjectToObjectClass in _objectToObjectClassSo._SpawnObjectToObjectClassSos)
+        {
+            validChannels.Add(spawnObjectToObjectClass.detectionClass);
+        }
+    }
 }
