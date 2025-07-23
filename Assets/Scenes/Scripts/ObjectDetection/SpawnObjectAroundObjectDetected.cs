@@ -1,22 +1,55 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Threading;
 using UnityEngine;
 using Random = UnityEngine.Random;
 
-public class SpawnObjectAroundObjectDetected : MonoBehaviour
+public class SpawnObjectsAroundObjectDetected : MonoBehaviour
 {
     private List<GameObject> spawnedObjects = new();
     private Dictionary<GameObject, int> spawnedObjectCount = new();
 
     [SerializeField] private ListSpawnObjectToObjectClassSO _listSpawnObjectToObjectClassSo;
 
+    [SerializeField] private Depth_ScreenToWorldPosition _screenToWorldPosition;
+
     private Camera mainCamera;
     private LayerMask meshLayer;
+    private Ray debugRay;
 
-    [SerializeField] private float timer = 2f;
+    public static SpawnObjectsAroundObjectDetected Instance;
+
+    private void Awake()
+    {
+        Instance = this;
+    }
+
+    public void RemoveAllSpawnedObjects()
+    {
+        for (int i = 0; i < spawnedObjects.Count; i++)
+        {
+            Destroy(spawnedObjects[i]);
+        }
+
+        spawnedObjects = new();
+        spawnedObjectCount = new();
+    }
+
+    public void ToggleSpawningOn()
+    {
+        preventSpawning = false;
+    }
+
+    public void ToggleSpawningOff()
+    {
+        preventSpawning = true;
+    }
+
+    [SerializeField] private float timer = 1f;
     private WaitForSeconds delay;
+
+    private bool preventSpawning = true;
+    private bool waitForNextSpawn = false;
 
     void Start()
     {
@@ -29,11 +62,20 @@ public class SpawnObjectAroundObjectDetected : MonoBehaviour
 
     private void ObjectDetectionSampleOnOnFoundItemAtPosition((string category, Vector2 rectPosition) objectDetectedAt)
     {
+        if (waitForNextSpawn) return;
+
+        if (preventSpawning) return;
+
         StartCoroutine(SpawnObjectsAtDetectedPositionWithDelay(objectDetectedAt));
     }
 
+    private Vector3 debugPoint;
+
     IEnumerator SpawnObjectsAtDetectedPositionWithDelay((string category, Vector2 rectPosition) objectDetectedAt)
     {
+        Debug.Log("SpawnObjectsAtDetectedPositionWithDelay");
+
+        waitForNextSpawn = true;
         yield return delay;
 
         if (_listSpawnObjectToObjectClassSo && _listSpawnObjectToObjectClassSo._SpawnObjectToObjectClassSos.Count > 0)
@@ -53,44 +95,31 @@ public class SpawnObjectAroundObjectDetected : MonoBehaviour
                         continue;
                     }
 
-                    (Vector3 hitPoint, Vector3 hitNormal) =
-                        ShootRaycastFromDetectedPosition(objectDetectedAt.rectPosition);
+                    Vector3 hitPointNew = _screenToWorldPosition
+                            .ConvertScreenToWorldPosition(objectDetectedAt.rectPosition);
 
-                    if (hitPoint != Vector3.zero && hitNormal != Vector3.zero)
+                    Debug.Log("Converted Hit Point is: " + hitPointNew);
+
+                    debugPoint = hitPointNew;
+
+                    if (hitPointNew != Vector3.zero)
                     {
-                        SpawnObjectAtHitPosition(hitPoint, hitNormal, spawnObjectToObjectClass.objectToSpawn);
+                        SpawnObjectAtHitPosition(hitPointNew, spawnObjectToObjectClass.objectToSpawn);
                     }
 
                 }
             }
         }
+
+        waitForNextSpawn = false;
     }
 
-    (Vector3 position, Vector3 normal) ShootRaycastFromDetectedPosition(Vector2 rectPosition)
-    {
-        Ray ray;
-        Vector2 convertScreenToRay = new Vector2(rectPosition.x / 2, rectPosition.y / 2);
-        ray = mainCamera.ScreenPointToRay(convertScreenToRay);
-        RaycastHit[] raycastHits = Physics.RaycastAll(ray, 50f);
-        if(raycastHits.Length > 0)
-        {
-            foreach(var raycastHit  in raycastHits)
-            {
-                if(raycastHit.collider.gameObject.layer == meshLayer)
-                {
-                    return (raycastHit.point, raycastHit.normal);
-                }
-            }
-        }
-        return (Vector3.zero, Vector3.zero);
-    }
-
-    void SpawnObjectAtHitPosition(Vector3 position, Vector3 normal, GameObject objectToSpawn)
+    void SpawnObjectAtHitPosition(Vector3 position, GameObject objectToSpawn)
     {
 
         GameObject spawnedObject;
 
-        spawnedObject = Instantiate(objectToSpawn, position, Quaternion.LookRotation(normal));
+        spawnedObject = Instantiate(objectToSpawn, position, Quaternion.identity);
 
         if (spawnedObjectCount.ContainsKey(objectToSpawn))
         {
@@ -114,5 +143,11 @@ public class SpawnObjectAroundObjectDetected : MonoBehaviour
         Color.yellow,
         Color.cyan,
     };
+    private void OnDrawGizmos()
+    {
+        Gizmos.color = randoms[Random.Range(0, randoms.Length)];
+        Gizmos.DrawRay(debugRay);
 
+        Gizmos.DrawWireSphere(debugPoint, .25f);
+    }
 }
